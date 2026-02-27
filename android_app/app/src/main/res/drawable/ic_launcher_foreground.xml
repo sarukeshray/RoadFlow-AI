@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Road surface -->
+    <path
+        android:fillColor="#455A64"
+        android:pathData="M20,40 L88,40 L88,75 L20,75 Z" />
+
+    <!-- Road center dashes -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M30,56 L42,56 L42,59 L30,59 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M48,56 L60,56 L60,59 L48,59 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M66,56 L78,56 L78,59 L66,59 Z" />
+
+    <!-- Pothole indicator (circle) -->
+    <path
+        android:fillColor="#DC3545"
+        android:pathData="M54,50 m-6,0 a6,6 0,1 1,12 0 a6,6 0,1 1,-12 0" />
+
+    <!-- Scan lines (AI detection effect) -->
+    <path
+        android:strokeColor="#3DDC84"
+        android:strokeWidth="1.5"
+        android:pathData="M20,43 L88,43" />
+    <path
+        android:strokeColor="#3DDC84"
+        android:strokeWidth="1.5"
+        android:pathData="M20,72 L88,72" />
+
+</vector>

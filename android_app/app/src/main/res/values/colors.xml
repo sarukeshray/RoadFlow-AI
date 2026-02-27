@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="pothole_red">#DC3545</color>
+    <color name="crack_orange">#FFA500</color>
+    <color name="manhole_blue">#007BFF</color>
+    <color name="rhi_good">#28A745</color>
+    <color name="rhi_fair">#FFC107</color>
+    <color name="rhi_critical">#DC3545</color>
+    <color name="overlay_bg">#B3000000</color>
+    <color name="ic_launcher_background">#3DDC84</color>
+</resources>

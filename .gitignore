@@ -1,0 +1,42 @@
+# ========================
+# Python / ML Pipeline
+# ========================
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+*.egg
+venv/
+.env
+*.tflite
+*.pt
+*.onnx
+ml_pipeline/raw_download/
+ml_pipeline/dataset/
+ml_pipeline/runs/
+ml_pipeline/kaggle.json
+
+# ========================
+# Android
+# ========================
+android_app/.gradle/
+android_app/build/
+android_app/app/build/
+android_app/local.properties
+android_app/.idea/
+android_app/captures/
+android_app/*.iml
+android_app/app/*.iml
+
+# ========================
+# IDE / OS
+# ========================
+.idea/
+*.iml
+.vscode/
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
