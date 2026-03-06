@@ -1,6 +1,8 @@
 plugins {
     id 'com.android.application'
     id 'org.jetbrains.kotlin.android'
+    // TODO: Uncomment after placing google-services.json in app/
+    // id 'com.google.gms.google-services'
 }
 
 android {
@@ -41,14 +43,6 @@ android {
     aaptOptions {
         noCompress "tflite"
     }
-
-    // Disable unit test tasks to prevent 'testClasses' not found error
-//    @Suppress("UnstableApiUsage")
-    testOptions {
-        unitTests.all {
-            enabled = false
-        }
-    }
 }
 
 dependencies {
@@ -68,6 +62,16 @@ dependencies {
     // TensorFlow Lite
     implementation 'org.tensorflow:tensorflow-lite:2.14.0'
     implementation 'org.tensorflow:tensorflow-lite-support:0.4.4'
+
+    // Google Maps
+    implementation 'com.google.android.gms:play-services-maps:18.2.0'
+    implementation 'com.google.android.gms:play-services-location:21.1.0'
+
+    // Firebase (BoM manages versions)
+    implementation platform('com.google.firebase:firebase-bom:32.7.1')
+    implementation 'com.google.firebase:firebase-auth-ktx'
+    implementation 'com.google.firebase:firebase-database-ktx'
+    implementation 'com.google.firebase:firebase-storage-ktx'
 
     // Lifecycle
     implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.7.0'

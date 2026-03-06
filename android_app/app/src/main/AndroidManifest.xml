@@ -2,7 +2,15 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.CAMERA" />
-    <uses-feature android:name="android.hardware.camera" android:required="true" />
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission
+        android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="28" />
+
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
 
     <application
         android:allowBackup="true"
@@ -12,16 +20,45 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.RoadFlowAI">
 
+        <!-- Google Maps API Key (replace with your key) -->
+        <meta-data
+            android:name="com.google.android.geo.API_KEY"
+            android:value="AIzaSyCa3-c_jtg1D2R2qr8rLcsT9vIGeoRI5pA" />
+
+        <!-- Welcome / Role Selection (launcher) -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:screenOrientation="portrait"
-            android:windowSoftInputMode="adjustResize">
+            android:screenOrientation="portrait">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Live Camera Scanner (CameraX + TFLite) -->
+        <activity
+            android:name=".LiveScannerActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+
+        <!-- Driver / Officer Login -->
+        <activity
+            android:name=".LoginActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+
+        <!-- Citizen Damage Report -->
+        <activity
+            android:name=".CitizenReportActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+
+        <!-- PWD Officer Dashboard -->
+        <activity
+            android:name=".OfficerDashboardActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
 
     </application>
 
