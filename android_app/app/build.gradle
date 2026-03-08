@@ -1,8 +1,14 @@
 plugins {
     id 'com.android.application'
     id 'org.jetbrains.kotlin.android'
-    // TODO: Uncomment after placing google-services.json in app/
-    // id 'com.google.gms.google-services'
+    id 'com.google.gms.google-services'
+}
+
+// Read API keys from local.properties (gitignored)
+def localProperties = new Properties()
+def localPropertiesFile = rootProject.file('local.properties')
+if (localPropertiesFile.exists()) {
+    localProperties.load(new FileInputStream(localPropertiesFile))
 }
 
 android {
@@ -17,6 +23,11 @@ android {
         versionName "1.0"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+
+        // Inject API key as manifest placeholder and BuildConfig field
+        def mapsKey = localProperties.getProperty('MAPS_API_KEY', '')
+        manifestPlaceholders = [MAPS_API_KEY: mapsKey]
+        buildConfigField "String", "MAPS_API_KEY", "\"${mapsKey}\""
     }
 
     buildTypes {
@@ -37,6 +48,7 @@ android {
 
     buildFeatures {
         viewBinding true
+        buildConfig true
     }
 
     // Prevent compression of TFLite model files
@@ -66,6 +78,13 @@ dependencies {
     // Google Maps
     implementation 'com.google.android.gms:play-services-maps:18.2.0'
     implementation 'com.google.android.gms:play-services-location:21.1.0'
+    implementation 'com.google.maps.android:android-maps-utils:3.8.2'
+
+    // Google Places SDK (Autocomplete)
+    implementation 'com.google.android.libraries.places:places:3.3.0'
+
+    // OkHttp (Directions API calls)
+    implementation 'com.squareup.okhttp3:okhttp:4.12.0'
 
     // Firebase (BoM manages versions)
     implementation platform('com.google.firebase:firebase-bom:32.7.1')

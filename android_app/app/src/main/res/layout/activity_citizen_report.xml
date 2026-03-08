@@ -240,12 +240,27 @@
                 android:textColor="#FFFFFF"
                 android:textSize="16sp" />
 
+            <!-- Submit Report Button (pushes to Firebase) -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnSubmitReport"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:layout_marginTop="24dp"
+                android:text="Submit Report"
+                android:textAllCaps="false"
+                android:textSize="16sp"
+                app:backgroundTint="#FFA500"
+                app:cornerRadius="16dp"
+                app:icon="@android:drawable/ic_menu_upload"
+                app:iconGravity="textStart"
+                app:iconPadding="12dp" />
+
             <!-- Download PDF Button -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnDownloadPdf"
                 android:layout_width="match_parent"
                 android:layout_height="56dp"
-                android:layout_marginTop="28dp"
+                android:layout_marginTop="12dp"
                 android:text="Download PDF Report"
                 android:textAllCaps="false"
                 android:textSize="16sp"

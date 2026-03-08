@@ -1,9 +1,9 @@
 package com.roadflow.ai
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
-import android.graphics.Color
 import android.os.Bundle
 import android.util.Log
 import android.widget.TextView
@@ -13,6 +13,8 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.google.android.gms.location.FusedLocationProviderClient
+import com.google.android.gms.location.LocationServices
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
 import com.google.android.gms.maps.OnMapReadyCallback
@@ -31,29 +33,33 @@ import com.google.firebase.database.ValueEventListener
  * OfficerDashboardActivity — PWD Officer Dashboard.
  *
  * Features:
- *   1. Full-screen Google Map with red markers for open damage reports
- *   2. Bottom Sheet with RecyclerView of report cards
- *   3. Firebase Realtime Database listener for live updates
- *   4. AI-powered repair verification via camera + TFLite
+ *   1. Full-screen Google Map with blue dot (My Location)
+ *   2. Auto-zoom to current location
+ *   3. Red markers for open damage reports from Firebase
+ *   4. Bottom Sheet with RecyclerView of report cards
+ *   5. AI-powered repair verification via camera + TFLite
  */
 class OfficerDashboardActivity : AppCompatActivity(), OnMapReadyCallback {
 
     companion object {
         private const val TAG = "OfficerDashboard"
-        private val DEFAULT_LOCATION = LatLng(12.9716, 77.5946) // Bangalore
+        private val DEFAULT_LOCATION = LatLng(12.9716, 77.5946) // Fallback
         private const val DEFAULT_ZOOM = 13f
+        private const val MY_LOCATION_ZOOM = 15f
     }
 
     private var googleMap: GoogleMap? = null
     private lateinit var reportAdapter: ReportAdapter
     private lateinit var tvReportCount: TextView
     private lateinit var tfliteHelper: TFLiteHelper
+    private lateinit var fusedLocationClient: FusedLocationProviderClient
 
-    private val markers = mutableMapOf<String, Marker>() // reportId -> Marker
+    private val markers = mutableMapOf<String, Marker>()
     private val openReports = mutableListOf<DamageReport>()
-    private var verifyingReportId: String? = null // Track which report is being verified
+    private var verifyingReportId: String? = null
 
     private var firebaseListener: ValueEventListener? = null
+    private var firebaseAvailable = false
 
     // Camera launcher for repair verification
     private val verifyPhotoLauncher = registerForActivityResult(
@@ -67,7 +73,6 @@ class OfficerDashboardActivity : AppCompatActivity(), OnMapReadyCallback {
         }
     }
 
-    // Camera permission for verification
     private val cameraPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted ->
@@ -79,9 +84,23 @@ class OfficerDashboardActivity : AppCompatActivity(), OnMapReadyCallback {
         }
     }
 
+    // Location permission launcher
+    private val locationPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        val granted = permissions[Manifest.permission.ACCESS_FINE_LOCATION] ?: false ||
+                permissions[Manifest.permission.ACCESS_COARSE_LOCATION] ?: false
+        if (granted) {
+            enableMyLocation()
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_officer_dashboard)
+
+        // Location client
+        fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
 
         // Initialize TFLite
         try {
@@ -120,22 +139,73 @@ class OfficerDashboardActivity : AppCompatActivity(), OnMapReadyCallback {
     override fun onMapReady(map: GoogleMap) {
         googleMap = map
 
-        // Dark mode map styling (simple approach)
         map.uiSettings.isZoomControlsEnabled = true
         map.uiSettings.isMapToolbarEnabled = false
+        map.uiSettings.isMyLocationButtonEnabled = true
 
-        // Move camera to default location
+        // Move to default first, then try to get real location
         map.moveCamera(CameraUpdateFactory.newLatLngZoom(DEFAULT_LOCATION, DEFAULT_ZOOM))
 
-        // Start listening to Firebase once map is ready
-        startFirebaseListener()
+        // Request location permission and enable blue dot
+        requestLocationAndEnableBlueDot()
+
+        // Start Firebase listener
+        try {
+            startFirebaseListener()
+            firebaseAvailable = true
+        } catch (e: Exception) {
+            Log.e(TAG, "Firebase not available: ${e.message}")
+            tvReportCount.text = "Firebase offline"
+            Toast.makeText(this, "Firebase not configured. Map is in offline mode.", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    /**
+     * Request location permission, enable blue dot, and zoom to current location.
+     */
+    private fun requestLocationAndEnableBlueDot() {
+        val hasFine = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) ==
+                PackageManager.PERMISSION_GRANTED
+        val hasCoarse = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) ==
+                PackageManager.PERMISSION_GRANTED
+
+        if (hasFine || hasCoarse) {
+            enableMyLocation()
+        } else {
+            locationPermissionLauncher.launch(
+                arrayOf(
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+                )
+            )
+        }
+    }
+
+    /**
+     * Enable the blue dot and animate camera to current location.
+     */
+    @SuppressLint("MissingPermission")
+    private fun enableMyLocation() {
+        val map = googleMap ?: return
+
+        // Enable the blue dot
+        map.isMyLocationEnabled = true
+
+        // Animate to current location
+        fusedLocationClient.lastLocation.addOnSuccessListener { location ->
+            if (location != null) {
+                val myLatLng = LatLng(location.latitude, location.longitude)
+                map.animateCamera(CameraUpdateFactory.newLatLngZoom(myLatLng, MY_LOCATION_ZOOM))
+                Log.d(TAG, "Moved camera to: ${location.latitude}, ${location.longitude}")
+            }
+        }
     }
 
     /**
      * Listen to Firebase Realtime Database for open reports.
      */
     private fun startFirebaseListener() {
-        val reportsRef = FirebaseDatabase.getInstance().getReference("reports")
+        val reportsRef = FirebaseDatabase.getInstance(AppConstants.FIREBASE_DB_URL).getReference("reports")
 
         firebaseListener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
@@ -145,7 +215,6 @@ class OfficerDashboardActivity : AppCompatActivity(), OnMapReadyCallback {
                     try {
                         val report = child.getValue(DamageReport::class.java)
                         if (report != null && report.status == "open") {
-                            // Ensure the ID is set from the Firebase key
                             val reportWithId = report.copy(id = child.key ?: report.id)
                             openReports.add(reportWithId)
                         }
@@ -154,15 +223,13 @@ class OfficerDashboardActivity : AppCompatActivity(), OnMapReadyCallback {
                     }
                 }
 
-                // Sort by newest first
                 openReports.sortByDescending { it.timestamp }
 
-                // Update UI
                 updateMapMarkers()
                 reportAdapter.submitList(openReports.toList())
                 tvReportCount.text = "${openReports.size} report${if (openReports.size != 1) "s" else ""}"
 
-                Log.d(TAG, "Loaded ${openReports.size} open reports")
+                Log.d(TAG, "Loaded ${openReports.size} open reports from Firebase")
             }
 
             override fun onCancelled(error: DatabaseError) {
@@ -178,17 +245,12 @@ class OfficerDashboardActivity : AppCompatActivity(), OnMapReadyCallback {
         reportsRef.addValueEventListener(firebaseListener!!)
     }
 
-    /**
-     * Update Google Map markers based on open reports.
-     */
     private fun updateMapMarkers() {
         val map = googleMap ?: return
 
-        // Clear existing markers
         markers.values.forEach { it.remove() }
         markers.clear()
 
-        // Add markers for open reports
         for (report in openReports) {
             val position = LatLng(report.lat, report.lon)
             val marker = map.addMarker(
@@ -204,9 +266,6 @@ class OfficerDashboardActivity : AppCompatActivity(), OnMapReadyCallback {
         }
     }
 
-    /**
-     * Handle "Verify Repair" button click — launch camera.
-     */
     private fun onVerifyRepairClicked(report: DamageReport) {
         verifyingReportId = report.id
         Toast.makeText(this, "Take a photo of the repaired road", Toast.LENGTH_SHORT).show()
@@ -220,10 +279,6 @@ class OfficerDashboardActivity : AppCompatActivity(), OnMapReadyCallback {
         }
     }
 
-    /**
-     * Process the verification photo through TFLite.
-     * If RHI == 100 (no damage), mark as resolved.
-     */
     private fun handleVerificationPhoto(bitmap: Bitmap) {
         val reportId = verifyingReportId
         if (reportId == null) {
@@ -240,10 +295,8 @@ class OfficerDashboardActivity : AppCompatActivity(), OnMapReadyCallback {
                 return
             }
 
-            // Run inference
             val detections = tfliteHelper.detect(bitmap)
 
-            // Count damage types
             var potholeCount = 0
             var crackCount = 0
 
@@ -257,7 +310,6 @@ class OfficerDashboardActivity : AppCompatActivity(), OnMapReadyCallback {
             val rhiScore = maxOf(0, 100 - (potholeCount * 15) - (crackCount * 5))
 
             if (rhiScore == 100) {
-                // Road is clean — mark as resolved
                 resolveReport(reportId)
                 Toast.makeText(
                     this,
@@ -265,11 +317,10 @@ class OfficerDashboardActivity : AppCompatActivity(), OnMapReadyCallback {
                     Toast.LENGTH_LONG
                 ).show()
             } else {
-                // Damage still detected
                 Toast.makeText(
                     this,
                     "Damage still detected (RHI: $rhiScore). Repair rejected.\n" +
-                            "Found: ${potholeCount} potholes, ${crackCount} cracks",
+                            "Found: $potholeCount potholes, $crackCount cracks",
                     Toast.LENGTH_LONG
                 ).show()
             }
@@ -282,35 +333,38 @@ class OfficerDashboardActivity : AppCompatActivity(), OnMapReadyCallback {
         }
     }
 
-    /**
-     * Update Firebase report status to "resolved".
-     */
     private fun resolveReport(reportId: String) {
-        val reportRef = FirebaseDatabase.getInstance()
-            .getReference("reports")
-            .child(reportId)
+        try {
+            val reportRef = FirebaseDatabase.getInstance(AppConstants.FIREBASE_DB_URL)
+                .getReference("reports")
+                .child(reportId)
 
-        reportRef.child("status").setValue("resolved")
-            .addOnSuccessListener {
-                Log.d(TAG, "Report $reportId resolved")
-                // Marker will be removed automatically by the ValueEventListener
-            }
-            .addOnFailureListener { e ->
-                Log.e(TAG, "Failed to resolve report $reportId", e)
-                Toast.makeText(this, "Failed to update report status", Toast.LENGTH_SHORT).show()
-            }
+            reportRef.child("status").setValue("resolved")
+                .addOnSuccessListener {
+                    Log.d(TAG, "Report $reportId resolved")
+                }
+                .addOnFailureListener { e ->
+                    Log.e(TAG, "Failed to resolve report $reportId", e)
+                    Toast.makeText(this, "Failed to update report status", Toast.LENGTH_SHORT).show()
+                }
+        } catch (e: Exception) {
+            Log.e(TAG, "Firebase not available for resolve", e)
+            Toast.makeText(this, "Firebase not configured", Toast.LENGTH_SHORT).show()
+        }
     }
 
     override fun onDestroy() {
         super.onDestroy()
 
-        // Remove Firebase listener
-        if (firebaseListener != null) {
-            FirebaseDatabase.getInstance().getReference("reports")
-                .removeEventListener(firebaseListener!!)
+        if (firebaseAvailable && firebaseListener != null) {
+            try {
+                FirebaseDatabase.getInstance(AppConstants.FIREBASE_DB_URL).getReference("reports")
+                    .removeEventListener(firebaseListener!!)
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to remove Firebase listener", e)
+            }
         }
 
-        // Release TFLite
         if (::tfliteHelper.isInitialized) {
             tfliteHelper.close()
         }

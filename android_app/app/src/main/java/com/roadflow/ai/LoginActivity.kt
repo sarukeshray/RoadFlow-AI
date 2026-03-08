@@ -8,8 +8,7 @@ import com.google.android.material.button.MaterialButton
 /**
  * LoginActivity — Placeholder for Driver/Officer authentication.
  *
- * Currently provides a "Continue as Officer (Demo)" button
- * that skips auth and goes directly to the dashboard.
+ * Provides demo buttons for both Driver and Officer flows.
  */
 class LoginActivity : AppCompatActivity() {
 
@@ -17,9 +16,14 @@ class LoginActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_login)
 
-        // Demo: go straight to officer dashboard
+        // Demo: go to Officer Dashboard
         findViewById<MaterialButton>(R.id.btnContinueOfficer).setOnClickListener {
             startActivity(Intent(this, OfficerDashboardActivity::class.java))
+        }
+
+        // Demo: go to Driver Navigation
+        findViewById<MaterialButton>(R.id.btnContinueDriver).setOnClickListener {
+            startActivity(Intent(this, DriverNavigationActivity::class.java))
         }
     }
 }

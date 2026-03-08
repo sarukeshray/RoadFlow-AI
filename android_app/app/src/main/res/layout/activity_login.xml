@@ -13,26 +13,41 @@
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Driver / Officer Login"
+        android:text="Select Role"
         android:textColor="#FFFFFF"
-        android:textSize="24sp"
+        android:textSize="26sp"
         android:textStyle="bold" />
 
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
+        android:layout_marginTop="12dp"
         android:gravity="center"
-        android:text="Firebase Authentication coming soon.\nUse the demo button below to access the dashboard."
+        android:text="Firebase Auth coming soon.\nUse the demo buttons below."
         android:textColor="#B3FFFFFF"
         android:textSize="15sp" />
 
-    <!-- Demo: Continue as Officer -->
+    <!-- Driver Navigation -->
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnContinueDriver"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:layout_marginTop="40dp"
+        android:text="Continue as Driver (Demo)"
+        android:textAllCaps="false"
+        android:textSize="16sp"
+        app:backgroundTint="#FFA500"
+        app:cornerRadius="14dp"
+        app:icon="@android:drawable/ic_menu_directions"
+        app:iconGravity="textStart"
+        app:iconPadding="12dp" />
+
+    <!-- Officer Dashboard -->
     <com.google.android.material.button.MaterialButton
         android:id="@+id/btnContinueOfficer"
         android:layout_width="match_parent"
         android:layout_height="56dp"
-        android:layout_marginTop="40dp"
+        android:layout_marginTop="16dp"
         android:text="Continue as Officer (Demo)"
         android:textAllCaps="false"
         android:textSize="16sp"

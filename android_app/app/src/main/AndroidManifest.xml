@@ -20,10 +20,10 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.RoadFlowAI">
 
-        <!-- Google Maps API Key (replace with your key) -->
+        <!-- Google Maps API Key (injected from local.properties) -->
         <meta-data
             android:name="com.google.android.geo.API_KEY"
-            android:value="AIzaSyCa3-c_jtg1D2R2qr8rLcsT9vIGeoRI5pA" />
+            android:value="${MAPS_API_KEY}" />
 
         <!-- Welcome / Role Selection (launcher) -->
         <activity
@@ -57,6 +57,12 @@
         <!-- PWD Officer Dashboard -->
         <activity
             android:name=".OfficerDashboardActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+
+        <!-- Driver Navigation -->
+        <activity
+            android:name=".DriverNavigationActivity"
             android:exported="false"
             android:screenOrientation="portrait" />
 

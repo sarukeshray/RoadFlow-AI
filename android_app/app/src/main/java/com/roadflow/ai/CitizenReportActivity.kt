@@ -1,6 +1,7 @@
 package com.roadflow.ai
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Color
@@ -16,6 +17,10 @@ import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import com.google.android.gms.location.FusedLocationProviderClient
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.Priority
+import com.google.android.gms.tasks.CancellationTokenSource
 import com.google.android.material.button.MaterialButton
 import com.google.firebase.database.FirebaseDatabase
 
@@ -26,7 +31,8 @@ import com.google.firebase.database.FirebaseDatabase
  *   1. User takes a photo or picks from gallery
  *   2. Image is run through YOLOv8 TFLite model
  *   3. Annotated image + RHI score displayed
- *   4. User can download a PDF report
+ *   4. User clicks "Submit Report" to push to Firebase
+ *   5. User can download a PDF report
  */
 class CitizenReportActivity : AppCompatActivity() {
 
@@ -35,6 +41,7 @@ class CitizenReportActivity : AppCompatActivity() {
     }
 
     private lateinit var tfliteHelper: TFLiteHelper
+    private lateinit var fusedLocationClient: FusedLocationProviderClient
 
     // UI — Initial state
     private lateinit var initialSection: LinearLayout
@@ -47,6 +54,7 @@ class CitizenReportActivity : AppCompatActivity() {
     private lateinit var rhiScoreText: TextView
     private lateinit var rhiGradeText: TextView
     private lateinit var detectionSummaryText: TextView
+    private lateinit var btnSubmitReport: MaterialButton
     private lateinit var btnDownloadPdf: MaterialButton
     private lateinit var btnScanAnother: MaterialButton
 
@@ -55,10 +63,15 @@ class CitizenReportActivity : AppCompatActivity() {
     private var lastDetections: List<TFLiteHelper.Detection> = emptyList()
     private var lastRhiScore: Int = 100
     private var lastRhiGrade: String = "Good"
+    private var lastSummaryText: String = ""
+    private var lastPotholes: Int = 0
+    private var lastCracks: Int = 0
+    private var lastManholes: Int = 0
+    private var currentLat: Double = 0.0
+    private var currentLon: Double = 0.0
 
     // --- Activity Result Launchers ---
 
-    // Camera: capture a preview bitmap
     private val takePictureLauncher = registerForActivityResult(
         ActivityResultContracts.TakePicturePreview()
     ) { bitmap ->
@@ -69,7 +82,6 @@ class CitizenReportActivity : AppCompatActivity() {
         }
     }
 
-    // Gallery: pick an image
     private val pickImageLauncher = registerForActivityResult(
         ActivityResultContracts.GetContent()
     ) { uri ->
@@ -84,7 +96,6 @@ class CitizenReportActivity : AppCompatActivity() {
         }
     }
 
-    // Camera permission request
     private val cameraPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted ->
@@ -95,7 +106,6 @@ class CitizenReportActivity : AppCompatActivity() {
         }
     }
 
-    // Storage permission request (for API < 29)
     private val storagePermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted ->
@@ -106,9 +116,24 @@ class CitizenReportActivity : AppCompatActivity() {
         }
     }
 
+    private val locationPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        val fineGranted = permissions[Manifest.permission.ACCESS_FINE_LOCATION] ?: false
+        val coarseGranted = permissions[Manifest.permission.ACCESS_COARSE_LOCATION] ?: false
+        if (fineGranted || coarseGranted) {
+            fetchCurrentLocation()
+        } else {
+            Log.w(TAG, "Location permission denied")
+            Toast.makeText(this, "Location unavailable. Using approximate coordinates.", Toast.LENGTH_SHORT).show()
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_citizen_report)
+
+        fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
 
         // Initialize TFLite
         try {
@@ -132,6 +157,7 @@ class CitizenReportActivity : AppCompatActivity() {
         rhiScoreText = findViewById(R.id.rhiScoreText)
         rhiGradeText = findViewById(R.id.rhiGradeText)
         detectionSummaryText = findViewById(R.id.detectionSummaryText)
+        btnSubmitReport = findViewById(R.id.btnSubmitReport)
         btnDownloadPdf = findViewById(R.id.btnDownloadPdf)
         btnScanAnother = findViewById(R.id.btnScanAnother)
 
@@ -154,10 +180,14 @@ class CitizenReportActivity : AppCompatActivity() {
             pickImageLauncher.launch("image/*")
         }
 
+        // Submit Report button — pushes to Firebase
+        btnSubmitReport.setOnClickListener {
+            submitReportToFirebase()
+        }
+
         // Download PDF button
         btnDownloadPdf.setOnClickListener {
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
-                // Need WRITE_EXTERNAL_STORAGE on API < 29
                 if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE)
                     != PackageManager.PERMISSION_GRANTED
                 ) {
@@ -175,36 +205,75 @@ class CitizenReportActivity : AppCompatActivity() {
 
         // Start in initial state
         showInitialState()
+
+        // Request location on launch
+        requestLocationPermission()
     }
 
-    /**
-     * Process the acquired image: run inference, draw boxes, show results.
-     */
+    private fun requestLocationPermission() {
+        val hasFine = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) ==
+                PackageManager.PERMISSION_GRANTED
+        val hasCoarse = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) ==
+                PackageManager.PERMISSION_GRANTED
+
+        if (hasFine || hasCoarse) {
+            fetchCurrentLocation()
+        } else {
+            locationPermissionLauncher.launch(
+                arrayOf(
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+                )
+            )
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun fetchCurrentLocation() {
+        val cancellationToken = CancellationTokenSource()
+        fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, cancellationToken.token)
+            .addOnSuccessListener { location ->
+                if (location != null) {
+                    currentLat = location.latitude
+                    currentLon = location.longitude
+                    Log.d(TAG, "Got current location: $currentLat, $currentLon")
+                } else {
+                    fusedLocationClient.lastLocation.addOnSuccessListener { lastLoc ->
+                        if (lastLoc != null) {
+                            currentLat = lastLoc.latitude
+                            currentLon = lastLoc.longitude
+                            Log.d(TAG, "Got last known location: $currentLat, $currentLon")
+                        }
+                    }
+                }
+            }
+            .addOnFailureListener { e ->
+                Log.e(TAG, "Failed to get location", e)
+            }
+    }
+
     private fun processImage(bitmap: Bitmap) {
         Toast.makeText(this, "Analyzing image...", Toast.LENGTH_SHORT).show()
 
         try {
-            // Run TFLite inference
             val detections = tfliteHelper.detect(bitmap)
             lastDetections = detections
 
-            // Draw bounding boxes on a copy
             annotatedBitmap = PdfGeneratorHelper.drawDetectionsOnBitmap(bitmap, detections)
 
-            // Calculate RHI
-            var potholeCount = 0
-            var crackCount = 0
-            var manholeCount = 0
+            lastPotholes = 0
+            lastCracks = 0
+            lastManholes = 0
 
             for (det in detections) {
                 when (det.classId) {
-                    0 -> potholeCount++
-                    1 -> crackCount++
-                    2 -> manholeCount++
+                    0 -> lastPotholes++
+                    1 -> lastCracks++
+                    2 -> lastManholes++
                 }
             }
 
-            lastRhiScore = maxOf(0, 100 - (potholeCount * 15) - (crackCount * 5))
+            lastRhiScore = maxOf(0, 100 - (lastPotholes * 15) - (lastCracks * 5))
             lastRhiGrade = when {
                 lastRhiScore >= 75 -> "Good"
                 lastRhiScore >= 50 -> "Fair"
@@ -212,19 +281,15 @@ class CitizenReportActivity : AppCompatActivity() {
                 else -> "Critical"
             }
 
-            // Build detection summary text
             val parts = mutableListOf<String>()
-            if (potholeCount > 0) parts.add("$potholeCount Pothole${if (potholeCount > 1) "s" else ""}")
-            if (crackCount > 0) parts.add("$crackCount Crack${if (crackCount > 1) "s" else ""}")
-            if (manholeCount > 0) parts.add("$manholeCount Manhole${if (manholeCount > 1) "s" else ""}")
+            if (lastPotholes > 0) parts.add("$lastPotholes Pothole${if (lastPotholes > 1) "s" else ""}")
+            if (lastCracks > 0) parts.add("$lastCracks Crack${if (lastCracks > 1) "s" else ""}")
+            if (lastManholes > 0) parts.add("$lastManholes Manhole${if (lastManholes > 1) "s" else ""}")
 
-            val summaryText = if (parts.isEmpty()) "No damage detected" else parts.joinToString(", ")
+            lastSummaryText = if (parts.isEmpty()) "No damage detected" else parts.joinToString(", ")
 
-            // Push report to Firebase
-            pushReportToFirebase(lastRhiScore, summaryText, potholeCount, crackCount, manholeCount)
-
-            // Update UI
-            showResultsState(summaryText)
+            // Show results — user must click "Submit Report" to push to Firebase
+            showResultsState(lastSummaryText)
 
         } catch (e: Exception) {
             Log.e(TAG, "Inference failed", e)
@@ -233,8 +298,76 @@ class CitizenReportActivity : AppCompatActivity() {
     }
 
     /**
-     * Show the initial state: camera/gallery buttons visible, results hidden.
+     * Called when user clicks "Submit Report" — pushes to Firebase with real GPS.
      */
+    @SuppressLint("MissingPermission")
+    private fun submitReportToFirebase() {
+        btnSubmitReport.isEnabled = false
+        btnSubmitReport.text = "Submitting..."
+
+        // Refresh location right before submit
+        val hasPerm = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) ==
+                PackageManager.PERMISSION_GRANTED ||
+                ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) ==
+                PackageManager.PERMISSION_GRANTED
+
+        if (hasPerm) {
+            fusedLocationClient.lastLocation.addOnSuccessListener { location ->
+                if (location != null) {
+                    currentLat = location.latitude
+                    currentLon = location.longitude
+                }
+                pushToFirebase()
+            }.addOnFailureListener {
+                pushToFirebase()
+            }
+        } else {
+            pushToFirebase()
+        }
+    }
+
+    private fun pushToFirebase() {
+        try {
+            val database = FirebaseDatabase.getInstance(AppConstants.FIREBASE_DB_URL)
+            val reportsRef = database.getReference("reports")
+            val newRef = reportsRef.push()
+
+            val report = DamageReport(
+                id = newRef.key ?: "",
+                lat = currentLat,
+                lon = currentLon,
+                rhiScore = lastRhiScore,
+                damageSummary = lastSummaryText,
+                potholes = lastPotholes,
+                cracks = lastCracks,
+                manholes = lastManholes,
+                timestamp = System.currentTimeMillis(),
+                status = "open"
+            )
+
+            Log.d(TAG, "Pushing to Firebase: url=${AppConstants.FIREBASE_DB_URL}, key=${newRef.key}")
+
+            newRef.setValue(report.toMap())
+                .addOnSuccessListener {
+                    Log.d(TAG, "Report pushed successfully: ${newRef.key}")
+                    Toast.makeText(this, "Report submitted successfully!", Toast.LENGTH_LONG).show()
+                    btnSubmitReport.text = "Submitted!"
+                    btnSubmitReport.setBackgroundColor(Color.rgb(40, 167, 69))
+                }
+                .addOnFailureListener { e ->
+                    Log.e(TAG, "Firebase push FAILED: ${e.message}", e)
+                    Toast.makeText(this, "Submit failed: ${e.message}", Toast.LENGTH_LONG).show()
+                    btnSubmitReport.isEnabled = true
+                    btnSubmitReport.text = "Submit Report"
+                }
+        } catch (e: Exception) {
+            Log.e(TAG, "Firebase exception: ${e.message}", e)
+            Toast.makeText(this, "Database error: ${e.message}", Toast.LENGTH_LONG).show()
+            btnSubmitReport.isEnabled = true
+            btnSubmitReport.text = "Submit Report"
+        }
+    }
+
     private fun showInitialState() {
         initialSection.visibility = View.VISIBLE
         resultsSection.visibility = View.GONE
@@ -242,12 +375,13 @@ class CitizenReportActivity : AppCompatActivity() {
         lastDetections = emptyList()
     }
 
-    /**
-     * Show the results state: annotated image, RHI score, PDF button.
-     */
     private fun showResultsState(summary: String) {
         initialSection.visibility = View.GONE
         resultsSection.visibility = View.VISIBLE
+
+        // Reset submit button
+        btnSubmitReport.isEnabled = true
+        btnSubmitReport.text = "Submit Report"
 
         resultImageView.setImageBitmap(annotatedBitmap)
 
@@ -258,16 +392,11 @@ class CitizenReportActivity : AppCompatActivity() {
             else -> Color.rgb(220, 53, 69)
         }
         rhiScoreText.setTextColor(rhiColor)
-
         rhiGradeText.text = lastRhiGrade
         rhiGradeText.setTextColor(rhiColor)
-
         detectionSummaryText.text = summary
     }
 
-    /**
-     * Generate and save the PDF report.
-     */
     private fun downloadPdfReport() {
         val bmp = annotatedBitmap
         if (bmp == null) {
@@ -287,43 +416,6 @@ class CitizenReportActivity : AppCompatActivity() {
             Toast.makeText(this, "PDF saved to Downloads: $fileName", Toast.LENGTH_LONG).show()
         } else {
             Toast.makeText(this, "Failed to save PDF report", Toast.LENGTH_LONG).show()
-        }
-    }
-
-    /**
-     * Push the damage report to Firebase Realtime Database.
-     */
-    private fun pushReportToFirebase(
-        rhiScore: Int,
-        summary: String,
-        potholes: Int,
-        cracks: Int,
-        manholes: Int
-    ) {
-        try {
-            val reportsRef = FirebaseDatabase.getInstance().getReference("reports")
-            val newRef = reportsRef.push()
-            val report = DamageReport(
-                id = newRef.key ?: "",
-                lat = 12.9716 + (Math.random() * 0.02 - 0.01),  // Mocked GPS with jitter
-                lon = 77.5946 + (Math.random() * 0.02 - 0.01),
-                rhiScore = rhiScore,
-                damageSummary = summary,
-                potholes = potholes,
-                cracks = cracks,
-                manholes = manholes,
-                timestamp = System.currentTimeMillis(),
-                status = "open"
-            )
-            newRef.setValue(report.toMap())
-                .addOnSuccessListener {
-                    Log.d(TAG, "Report pushed to Firebase: ${newRef.key}")
-                }
-                .addOnFailureListener { e ->
-                    Log.e(TAG, "Failed to push report", e)
-                }
-        } catch (e: Exception) {
-            Log.e(TAG, "Firebase push failed", e)
         }
     }
 
