@@ -1,4 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">RoadFlow AI</string>
+    <string name="start_navigation">Start Navigation</string>
+    <string name="vehicle_car">Car</string>
+    <string name="vehicle_two_wheeler">Two-Wheeler</string>
+    <string name="hazard_alert">⚠  Road Damage Ahead!</string>
+    <string name="stop_navigation">Stop Navigation</string>
 </resources>

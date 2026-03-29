@@ -133,6 +133,17 @@
             android:textColor="#4DFFFFFF"
             android:textSize="12sp" />
 
+        <!-- Watermark -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="Made by team A5P"
+            android:textColor="#B3FFFFFF"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.05" />
+
     </LinearLayout>
 
 </ScrollView>

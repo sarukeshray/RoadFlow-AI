@@ -32,7 +32,7 @@ android_app/app/*.iml
 # Secrets — NEVER commit these
 android_app/app/google-services.json
 local.properties
-android_app/app/google-services.json
+
 
 # ========================
 # IDE / OS

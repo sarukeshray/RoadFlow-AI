@@ -14,8 +14,27 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
-    <!-- Top overlay: Back button + Search card -->
+    <!-- Watermark: Team A5P -->
+    <TextView
+        android:id="@+id/tvWatermark"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|end"
+        android:layout_marginTop="80dp"
+        android:layout_marginEnd="16dp"
+        android:text="Made by team A5P"
+        android:textColor="#80FFFFFF"
+        android:textSize="12sp"
+        android:textStyle="bold"
+        android:shadowColor="#80000000"
+        android:shadowDx="1"
+        android:shadowDy="1"
+        android:shadowRadius="2"
+        android:letterSpacing="0.05" />
+
+    <!-- Top overlay: Back button + Search card + Vehicle selector -->
     <LinearLayout
+        android:id="@+id/topOverlay"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
@@ -93,7 +112,96 @@
 
         </com.google.android.material.card.MaterialCardView>
 
+        <!-- Vehicle Type Selector -->
+        <com.google.android.material.button.MaterialButtonToggleGroup
+            android:id="@+id/vehicleToggleGroup"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            app:singleSelection="true"
+            app:selectionRequired="true"
+            app:checkedButton="@id/btnCar">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnCar"
+                style="?attr/materialButtonOutlinedStyle"
+                android:layout_width="0dp"
+                android:layout_height="44dp"
+                android:layout_weight="1"
+                android:text="@string/vehicle_car"
+                android:textColor="#FFFFFF"
+                android:textSize="13sp"
+                app:icon="@android:drawable/ic_menu_directions"
+                app:iconTint="#FFA500"
+                app:iconGravity="textStart"
+                app:strokeColor="#444444"
+                app:backgroundTint="#1E1E1E"
+                app:cornerRadius="12dp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnTwoWheeler"
+                style="?attr/materialButtonOutlinedStyle"
+                android:layout_width="0dp"
+                android:layout_height="44dp"
+                android:layout_weight="1"
+                android:text="@string/vehicle_two_wheeler"
+                android:textColor="#FFFFFF"
+                android:textSize="13sp"
+                app:icon="@android:drawable/ic_menu_directions"
+                app:iconTint="#FFA500"
+                app:iconGravity="textStart"
+                app:strokeColor="#444444"
+                app:backgroundTint="#1E1E1E"
+                app:cornerRadius="12dp" />
+
+        </com.google.android.material.button.MaterialButtonToggleGroup>
+
     </LinearLayout>
+
+    <!-- Proximity Alert Warning Card (hidden by default, shown during Active Nav) -->
+    <com.google.android.material.card.MaterialCardView
+        android:id="@+id/alertCard"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|center_horizontal"
+        android:layout_marginStart="16dp"
+        android:layout_marginEnd="16dp"
+        android:layout_marginTop="140dp"
+        android:visibility="gone"
+        app:cardBackgroundColor="@color/alert_red_bg"
+        app:cardCornerRadius="16dp"
+        app:cardElevation="12dp"
+        app:strokeColor="@color/alert_red"
+        app:strokeWidth="2dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:orientation="horizontal"
+            android:padding="14dp">
+
+            <ImageView
+                android:layout_width="28dp"
+                android:layout_height="28dp"
+                android:contentDescription="Warning"
+                android:src="@android:drawable/ic_dialog_alert"
+                app:tint="#FFFFFF" />
+
+            <TextView
+                android:id="@+id/tvAlertText"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="12dp"
+                android:text="@string/hazard_alert"
+                android:textColor="#FFFFFF"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+
+        </LinearLayout>
+
+    </com.google.android.material.card.MaterialCardView>
 
     <!-- Bottom Route Info Bar -->
     <LinearLayout
@@ -132,6 +240,23 @@
             android:text=""
             android:textColor="#60FFFFFF"
             android:textSize="12sp" />
+
+        <!-- Start / Stop Navigation Button -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnStartNavigation"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:layout_marginTop="12dp"
+            android:text="@string/start_navigation"
+            android:textColor="#FFFFFF"
+            android:textSize="16sp"
+            android:textAllCaps="false"
+            android:textStyle="bold"
+            app:backgroundTint="@color/nav_green"
+            app:cornerRadius="14dp"
+            app:icon="@android:drawable/ic_media_play"
+            app:iconTint="#FFFFFF"
+            app:iconGravity="textStart" />
 
     </LinearLayout>
 
