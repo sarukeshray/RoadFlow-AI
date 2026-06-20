@@ -182,7 +182,7 @@ cd RoadFlow-AI/android_app
 ## 👤 Author
 
 **Sarukesh Ray**
-📧 devasorubi@gmail.com
+📧 sarukeshray2912@gmail.com
 
 > Built as a full end-to-end showcase: dataset preparation, model training & TFLite export, custom on-device inference, and a multi-role Android product — from neural network to navigation.
 
