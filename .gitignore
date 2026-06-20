@@ -1,5 +1,5 @@
 # ========================
-# Python / ML Pipeline
+# Python
 # ========================
 __pycache__/
 *.py[cod]
@@ -9,13 +9,8 @@ build/
 *.egg
 venv/
 .env
-*.tflite
 *.pt
 *.onnx
-ml_pipeline/raw_download/
-ml_pipeline/dataset/
-ml_pipeline/runs/
-ml_pipeline/kaggle.json
 
 # ========================
 # Android

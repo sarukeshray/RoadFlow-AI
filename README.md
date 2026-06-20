@@ -1,36 +1,98 @@
-# RoadFlow-AI
+<div align="center">
 
-RoadFlow-AI is an Android-first road monitoring project that combines on-device computer vision, citizen reporting, smart route guidance, and officer-side verification.
+# 🛣️ RoadFlow-AI
 
-At a high level, the project does four things:
+### On-device AI for safer roads — detect damage, score road health, and route around hazards.
 
-1. Detects potholes, cracks, and manholes with a YOLOv8 model exported to TensorFlow Lite.
-2. Lets citizens capture road images, compute a Road Health Index (RHI), and submit geo-tagged reports.
-3. Helps drivers choose safer routes by scoring Google Directions alternatives against open damage reports.
-4. Gives public works officers a live map of open reports and a camera-based repair verification flow.
+*An Android app that runs a YOLOv8 computer-vision model entirely on the phone to spot potholes, cracks, and manholes in real time, turns each scan into a Road Health Index, and uses crowd-sourced reports to guide drivers along safer routes.*
 
-## Visualization
+<br/>
+
+![Platform](https://img.shields.io/badge/Platform-Android-3DDC84?style=for-the-badge&logo=android&logoColor=white)
+![Kotlin](https://img.shields.io/badge/Kotlin-7F52FF?style=for-the-badge&logo=kotlin&logoColor=white)
+![TensorFlow Lite](https://img.shields.io/badge/TensorFlow_Lite-FF6F00?style=for-the-badge&logo=tensorflow&logoColor=white)
+![YOLOv8](https://img.shields.io/badge/YOLOv8-00FFFF?style=for-the-badge&logo=yolo&logoColor=black)
+![Firebase](https://img.shields.io/badge/Firebase-FFCA28?style=for-the-badge&logo=firebase&logoColor=black)
+![Google Maps](https://img.shields.io/badge/Google_Maps-4285F4?style=for-the-badge&logo=googlemaps&logoColor=white)
+
+<br/>
+
+**[📥 Download the APK](android_app/app/release/app-release.apk)** &nbsp;•&nbsp; **[✨ Features](#-features)** &nbsp;•&nbsp; **[🏗️ Architecture](#%EF%B8%8F-architecture)** &nbsp;•&nbsp; **[🚀 Getting Started](#-getting-started)**
+
+</div>
+
+---
+
+## 💡 The Idea
+
+Damaged roads cause accidents, vehicle wear, and millions in repair costs — yet reporting them is slow and manual. **RoadFlow-AI closes that loop on a single device:** a citizen points their phone at the road, an on-device neural network identifies the damage in real time, the app computes an objective **Road Health Index (RHI)**, and the geo-tagged report instantly powers safer routing for drivers and a verification workflow for public-works officers.
+
+No server-side inference. No round trips. The model runs **offline, on the phone**, in milliseconds per frame.
+
+---
+
+## ✨ Features
+
+| | Feature | What it does |
+|---|---|---|
+| 📷 | **Live Road Scanner** | Real-time CameraX feed analyzed frame-by-frame by a TFLite YOLOv8 model with on-screen bounding boxes and a live RHI badge. |
+| 📝 | **Citizen Reporting** | Snap or upload a photo → get an annotated image, damage breakdown, RHI score, and a generated **PDF report** → submit a geo-tagged entry to the cloud. |
+| 🧭 | **Safer Driver Navigation** | Scores Google Directions alternatives against live hazard reports and highlights the route that crosses the **fewest** known road defects. |
+| 🛠️ | **Officer Dashboard** | A live map + list of open reports; officers re-scan a repaired road and the report auto-resolves when the RHI returns to 100. |
+
+---
+
+## 🧠 How the AI Works
+
+RoadFlow-AI pairs a lightweight detector with a transparent scoring rule:
+
+```
+            ┌──────────────┐     detects      ┌─────────────────────────┐
+ Camera ──▶ │  YOLOv8n      │ ───────────────▶ │ Pothole · Crack · Manhole│
+ frame      │  (TFLite)     │   bounding boxes └─────────────────────────┘
+            └──────────────┘                              │
+                                                          ▼
+                                       RHI = max(0, 100 − 15·potholes − 5·cracks)
+```
+
+**The model**
+- **Architecture:** YOLOv8 **Nano** — chosen for sub-100 ms inference on mid-range phones.
+- **Training data:** Kaggle *Road Damage Dataset (Potholes, Cracks & Manholes)*, split 80 / 10 / 10.
+- **Pipeline:** trained on GPU → exported through the `.pt → ONNX → TensorFlow → TFLite` chain.
+- **On-device tensor:** input `(1, 640, 640, 3)` float32 · output `(1, 7, 8400)` → custom Kotlin post-processing with confidence thresholding + **Non-Max Suppression**.
+- **Shipped artifact:** [`best_float32.tflite`](android_app/app/src/main/assets/best_float32.tflite) (~12 MB), bundled in the app — no download required.
+
+**The Road Health Index**
+
+| Score | Grade |
+|---|---|
+| 75–100 | 🟢 Good |
+| 50–74 | 🟡 Fair |
+| 25–49 | 🟠 Poor |
+| 0–24 | 🔴 Critical |
+
+---
+
+## 🏗️ Architecture
 
 ```mermaid
 flowchart LR
-    A["ML Pipeline (Python)"] --> B["Train YOLOv8n on road-damage dataset"]
-    B --> C["Export model to TFLite"]
-    C --> D["android_app/app/src/main/assets/best_float32.tflite"]
+    subgraph Device["📱 On-Device"]
+        CAM["Camera / Gallery"] --> TFL["YOLOv8 TFLite\nInference"]
+        TFL --> RHI["RHI Scoring"]
+        RHI --> UI["Annotated UI + PDF"]
+    end
 
-    D --> E["Android App"]
-    E --> F["Live Scanner"]
-    E --> G["Citizen Report"]
-    E --> H["Driver Navigation"]
-    E --> I["Officer Dashboard"]
+    subgraph Cloud["☁️ Cloud"]
+        FB[("Firebase\nRealtime DB")]
+        GM["Google Maps /\nDirections API"]
+    end
 
-    G --> J["Firebase Realtime Database"]
-    I --> J
-    H --> J
-
-    H --> K["Google Maps / Places / Directions API"]
-    G --> L["Device Camera + Location"]
-    I --> L
-    F --> L
+    UI -->|"geo-tagged report"| FB
+    FB -->|"open hazards"| DRV["Driver Navigation"]
+    FB -->|"report map"| OFF["Officer Dashboard"]
+    DRV --> GM
+    OFF -->|"re-scan & resolve"| FB
 ```
 
 ```mermaid
@@ -40,209 +102,91 @@ sequenceDiagram
     participant TFLite
     participant Firebase
     participant Driver
-    participant Officer
 
-    Citizen->>App: Capture or upload road image
-    App->>TFLite: Run damage detection
-    TFLite-->>App: Pothole / Crack / Manhole detections
-    App-->>Citizen: Show annotated image + RHI + PDF option
-    Citizen->>Firebase: Submit report with GPS and summary
-    Driver->>App: Request route to destination
-    App->>Firebase: Load open reports
+    Citizen->>App: Capture road image
+    App->>TFLite: Run on-device detection
+    TFLite-->>App: Potholes / Cracks / Manholes
+    App-->>Citizen: Annotated image + RHI + PDF
+    Citizen->>Firebase: Submit geo-tagged report
+    Driver->>App: Request route
+    App->>Firebase: Load open hazards
     App-->>Driver: Highlight safest route
-    Officer->>Firebase: View report map and list
-    Officer->>App: Capture repair verification photo
-    App->>TFLite: Re-check repaired road
-    TFLite-->>Officer: RHI result
-    Officer->>Firebase: Mark report resolved if road is clear
 ```
 
-## What is in this repo
+---
+
+## 🛠️ Tech Stack
+
+**Mobile** — Kotlin · Android Views + ViewBinding · CameraX · Material Components
+**On-device ML** — TensorFlow Lite · YOLOv8 (Ultralytics) · custom NMS post-processing
+**Cloud & APIs** — Firebase Realtime Database · Google Maps SDK · Places SDK · Directions API (OkHttp)
+**Tooling** — Gradle · PDF generation (Android `PdfDocument`)
+
+---
+
+## 📂 Project Structure
 
 ```text
 RoadFlow-AI/
-|-- android_app/      # Android client in Kotlin
-|-- ml_pipeline/      # Dataset prep, training, export, and RHI utilities
-|-- FIREBASE_SETUP.md # Firebase-specific setup notes
+├── android_app/                         # Kotlin Android client
+│   └── app/src/main/
+│       ├── java/com/roadflow/ai/
+│       │   ├── LiveScannerActivity.kt   # Real-time camera scanning
+│       │   ├── CitizenReportActivity.kt # Capture, score, PDF, submit
+│       │   ├── DriverNavigationActivity.kt
+│       │   ├── OfficerDashboardActivity.kt
+│       │   ├── TFLiteHelper.kt          # Model loading + inference + NMS
+│       │   ├── RouteScorer.kt           # Route-vs-hazard scoring
+│       │   └── PdfGeneratorHelper.kt
+│       └── assets/best_float32.tflite   # Bundled YOLOv8 model
+├── FIREBASE_SETUP.md
+└── README.md
 ```
 
-## Core product flows
+---
 
-### 1. Live road scanning
-- `LiveScannerActivity` uses CameraX and `RoadDamageAnalyzer` for real-time inference.
-- `TFLiteHelper` loads `best_float32.tflite` from app assets and runs YOLOv8-style post-processing plus non-max suppression.
-- The app computes a simple Road Health Index:
-  - `RHI = max(0, 100 - 15*potholes - 5*cracks)`
-
-### 2. Citizen reporting
-- `CitizenReportActivity` lets a user take a photo or pick one from the gallery.
-- The image is analyzed locally on-device.
-- The user sees an annotated image, damage summary, RHI score, and a generated PDF report.
-- Submitting pushes a structured report into Firebase Realtime Database under `reports/`.
-
-### 3. Safer driver navigation
-- `DriverNavigationActivity` uses Google Places Autocomplete and the Google Directions API.
-- Alternative routes are scored against open road-damage reports stored in Firebase.
-- `RouteScorer` checks whether reports intersect a route polyline using a 25 m tolerance.
-- The app highlights the safest route and can switch into active navigation mode with proximity alerts.
-
-### 4. Officer dashboard and repair verification
-- `OfficerDashboardActivity` loads open reports from Firebase onto a Google Map and a bottom-sheet list.
-- Officers can capture a fresh image after a repair.
-- If the verification scan returns `RHI = 100`, the report status is updated from `open` to `resolved`.
-
-## Tech stack
-
-### Android app
-- Kotlin + Android Views/ViewBinding
-- CameraX
-- TensorFlow Lite
-- Google Maps SDK
-- Google Places SDK
-- Google Directions API over OkHttp
-- Firebase Realtime Database
-
-### ML pipeline
-- Python
-- Ultralytics YOLOv8
-- TensorFlow / ONNX export chain
-- Kaggle API for dataset download
-
-## ML pipeline
-
-The Python side is organized as a simple training-to-deployment pipeline:
-
-1. `download_data.py`
-   - Downloads the Kaggle dataset `lorenzoarcioni/road-damage-dataset-potholes-cracks-and-manholes`
-   - Builds a YOLOv8 dataset layout
-   - Splits the data into `train` 80%, `valid` 10%, `test` 10%
-2. `train.py`
-   - Trains `yolov8n.pt`
-   - Default settings: `50` epochs, `640` image size, batch size `16`
-3. `export.py`
-   - Exports the trained model to TensorFlow Lite for Android deployment
-4. `rhi_calculator.py`
-   - Contains reusable Python-side RHI logic and a small self-test/demo
-
-Detected classes in the current dataset:
-
-- Pothole
-- Crack
-- Manhole
-
-Important generated artifacts:
-
-- `ml_pipeline/runs/detect/train/weights/best.pt`
-- `ml_pipeline/runs/detect/train/weights/best.onnx`
-- `android_app/app/src/main/assets/best_float32.tflite`
-
-## Android app structure
-
-Important Kotlin files:
-
-- `MainActivity` - launcher and role selection
-- `LoginActivity` - placeholder entry into driver/officer flows
-- `LiveScannerActivity` - real-time road scanning
-- `CitizenReportActivity` - report creation, Firebase submission, PDF export
-- `DriverNavigationActivity` - smart routing and active navigation alerts
-- `OfficerDashboardActivity` - report map, list, and repair verification
-- `TFLiteHelper` - model loading, inference, and post-processing
-- `RouteScorer` - route-vs-hazard scoring
-- `PdfGeneratorHelper` - PDF report generation
-
-## Setup
+## 🚀 Getting Started
 
 ### Prerequisites
-
-- Android Studio
-- Android SDK 34
-- A Google Maps Platform API key
+- Android Studio (latest) + Android SDK 34
+- A [Google Maps Platform](https://developers.google.com/maps) API key
 - A Firebase project with Realtime Database enabled
-- Python 3.10+ recommended for the ML pipeline
 
-### Android setup
-
-1. Open `android_app` in Android Studio.
-2. Add `google-services.json` to:
-   - `android_app/app/google-services.json`
-3. Put your Maps key in:
-
-```properties
-# android_app/local.properties
-MAPS_API_KEY=YOUR_GOOGLE_MAPS_API_KEY
-```
-
-4. Sync Gradle and build the app.
-
-### Firebase notes
-
-- The app expects Firebase Realtime Database reports under the `reports` node.
-- The configured database URL lives in `AppConstants.kt`.
-- `FIREBASE_SETUP.md` contains the project-specific Firebase bootstrapping steps.
-
-### ML setup
-
-1. Create and activate a Python environment inside `ml_pipeline`.
-2. Install dependencies:
-
+### Run it
 ```bash
-pip install -r requirements.txt
+git clone <this-repo>
+cd RoadFlow-AI/android_app
 ```
 
-3. Add Kaggle credentials:
-   - `ml_pipeline/kaggle.json`
-4. Run the pipeline:
+1. **Maps key** — add to `android_app/local.properties`:
+   ```properties
+   MAPS_API_KEY=YOUR_GOOGLE_MAPS_API_KEY
+   ```
+2. **Firebase** — drop your own `google-services.json` into `android_app/app/`
+   *(not committed — provide your own; see [FIREBASE_SETUP.md](FIREBASE_SETUP.md))*.
+3. **Build & run** — open `android_app` in Android Studio, sync Gradle, hit ▶.
 
-```bash
-python download_data.py
-python train.py
-python export.py
-```
+> ⚡ Want to try it instantly? **[Download the prebuilt APK](android_app/app/release/app-release.apk)** and sideload it (enable "Install unknown apps").
 
-5. Copy the exported `.tflite` model into:
-   - `android_app/app/src/main/assets/`
+---
 
-## How the scoring works
+## 🗺️ Roadmap
 
-### Road Health Index
+- [ ] Full authentication (the current login is a role-selection placeholder)
+- [ ] Severity-aware RHI (weight by damage size/area, not just count)
+- [ ] Firebase Storage for original report imagery
+- [ ] Cloud analytics dashboard for road-network health trends
 
-- Start from `100`
-- `-15` for each pothole
-- `-5` for each crack
-- Clamp at `0`
+---
 
-Grades used in the project:
+## 👤 Author
 
-- `75-100`: Good
-- `50-74`: Fair
-- `25-49`: Poor
-- `0-24`: Critical
+**Sarukesh Ray**
+📧 devasorubi@gmail.com
 
-### Route safety
+> Built as a full end-to-end showcase: dataset preparation, model training & TFLite export, custom on-device inference, and a multi-role Android product — from neural network to navigation.
 
-- Fetch alternative routes from Google Directions
-- Decode route polylines
-- Compare each route against open Firebase reports
-- Rank routes by the fewest hazard intersections
-
-## Current implementation notes
-
-- The login flow is currently a placeholder screen, not a full authentication system.
-- Citizen reporting uses Firebase Realtime Database; Firebase Storage is included as a dependency but is not yet central to the current flow.
-- PDF generation currently uses approximate GPS text inside the PDF template.
-- Some generated folders and local environment files are checked into the repo, so this project is best treated as a working prototype rather than a cleaned production repo.
-
-## Demo journey
-
-1. Train and export the model in `ml_pipeline`.
-2. Place the exported TFLite file in the Android app assets.
-3. Launch the app and choose one of three paths:
-   - Live Scanner
-   - Report a Damage
-   - Login, then continue as Driver or Officer
-4. Submit citizen reports to Firebase.
-5. Use those reports to power driver route scoring and officer verification.
-
-## License
-
-No license file is currently included in this repository.
+<div align="center">
+<br/>
+⭐ If you find this project interesting, consider starring the repo!
+</div>
