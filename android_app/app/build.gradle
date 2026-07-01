@@ -1,15 +1,23 @@
 plugins {
     id 'com.android.application'
     id 'org.jetbrains.kotlin.android'
-    id 'com.google.gms.google-services'
 }
 
-// Read API keys from local.properties (gitignored)
-def localProperties = new Properties()
-def localPropertiesFile = rootProject.file('local.properties')
-if (localPropertiesFile.exists()) {
-    localProperties.load(new FileInputStream(localPropertiesFile))
+// ---------------------------------------------------------------------------
+// Load secrets from .env (preferred), falling back to local.properties.
+// Neither file is committed — see .env.example for the required keys.
+// ---------------------------------------------------------------------------
+def envProps = new Properties()
+def envFile = rootProject.file('.env')
+if (envFile.exists()) {
+    envFile.withInputStream { envProps.load(it) }
 }
+def localProps = new Properties()
+def localPropsFile = rootProject.file('local.properties')
+if (localPropsFile.exists()) {
+    localPropsFile.withInputStream { localProps.load(it) }
+}
+def secret = { String key -> envProps.getProperty(key) ?: localProps.getProperty(key, '') }
 
 android {
     namespace 'com.roadflow.ai'
@@ -24,10 +32,16 @@ android {
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
-        // Inject API key as manifest placeholder and BuildConfig field
-        def mapsKey = localProperties.getProperty('MAPS_API_KEY', '')
+        // Inject secrets as a manifest placeholder + BuildConfig fields
+        def mapsKey = secret('MAPS_API_KEY')
         manifestPlaceholders = [MAPS_API_KEY: mapsKey]
         buildConfigField "String", "MAPS_API_KEY", "\"${mapsKey}\""
+        buildConfigField "String", "FIREBASE_API_KEY", "\"${secret('FIREBASE_API_KEY')}\""
+        buildConfigField "String", "FIREBASE_APP_ID", "\"${secret('FIREBASE_APP_ID')}\""
+        buildConfigField "String", "FIREBASE_PROJECT_ID", "\"${secret('FIREBASE_PROJECT_ID')}\""
+        buildConfigField "String", "FIREBASE_PROJECT_NUMBER", "\"${secret('FIREBASE_PROJECT_NUMBER')}\""
+        buildConfigField "String", "FIREBASE_STORAGE_BUCKET", "\"${secret('FIREBASE_STORAGE_BUCKET')}\""
+        buildConfigField "String", "FIREBASE_DB_URL", "\"${secret('FIREBASE_DB_URL')}\""
     }
 
     buildTypes {

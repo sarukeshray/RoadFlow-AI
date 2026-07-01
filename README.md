@@ -158,13 +158,14 @@ git clone <this-repo>
 cd RoadFlow-AI/android_app
 ```
 
-1. **Maps key** — add to `android_app/local.properties`:
-   ```properties
-   MAPS_API_KEY=YOUR_GOOGLE_MAPS_API_KEY
+1. **Configure secrets** — copy the template and fill in your own keys:
+   ```bash
+   cp android_app/.env.example android_app/.env
    ```
-2. **Firebase** — drop your own `google-services.json` into `android_app/app/`
-   *(not committed — provide your own; see [FIREBASE_SETUP.md](FIREBASE_SETUP.md))*.
-3. **Build & run** — open `android_app` in Android Studio, sync Gradle, hit ▶.
+   Open `android_app/.env` and set your Google Maps + Firebase values. This file is
+   **gitignored** and is injected into `BuildConfig` at build time — it drives both the
+   Maps key and Firebase initialization, so **no `google-services.json` is needed**.
+2. **Build & run** — open `android_app` in Android Studio, sync Gradle, hit ▶.
 
 > ⚡ Want to try it instantly? **[Download the prebuilt APK](android_app/app/release/app-release.apk)** and sideload it (enable "Install unknown apps").
 

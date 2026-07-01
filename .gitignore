@@ -27,6 +27,9 @@ android_app/app/*.iml
 # Secrets — NEVER commit these
 android_app/app/google-services.json
 local.properties
+# Local secrets — never commit .env, but DO keep the .env.example template
+.env
+!.env.example
 
 
 # ========================
